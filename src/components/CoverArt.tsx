@@ -15,7 +15,7 @@ export interface CoverSource {
 const PALETTES: [string, string, string][] = [
   ['#e8e2d4', '#151515', '#d24a2c'],
   ['#14213d', '#f1ede4', '#f2b134'],
-  ['#1e1e1e', '#e9e6df', '#d4ff3a'],
+  ['#1e1e1e', '#e9e6df', '#ff7a2e'],
   ['#c8d5cf', '#1d2b26', '#e0592a'],
   ['#2b1d3a', '#f4d9e8', '#ff6fb1'],
   ['#efe9dd', '#2a2a2a', '#2f6fd6'],

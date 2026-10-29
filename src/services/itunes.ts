@@ -23,18 +23,27 @@ export async function searchAlbums(term: string, limit = 12): Promise<ItunesAlbu
   return data.results ?? []
 }
 
+/** Titre sans mentions d'édition : « (Remastered 2009) », « [Deluxe] », « - EP »… */
+const cleanTitle = (t: string) =>
+  normalize(t.replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+-\s+(single|ep)$/i, ''))
+
+/** Correspondance stricte : même artiste et même titre (hors mentions d'édition). */
+function matchAlbum(results: ItunesAlbum[], artist: string, title: string): ItunesAlbum | undefined {
+  const na = normalize(artist)
+  const nt = cleanTitle(title)
+  const same = results.filter((r) => normalize(r.artistName) === na && cleanTitle(r.collectionName) === nt)
+  // On préfère l'édition « standard » (titre le plus court) aux versions deluxe.
+  return same.sort((a, b) => a.collectionName.length - b.collectionName.length)[0]
+}
+
 /** Trouve la pochette la plus probable pour un couple artiste/titre (avec cache 30 j). */
 export async function findArtwork(artist: string, title: string): Promise<string | undefined> {
-  const key = `art:${normalize(artist)}|${normalize(title)}`
+  const key = `art2:${normalize(artist)}|${normalize(title)}`
   const cached = await cacheGet<string | null>(key)
   if (cached !== undefined) return cached ?? undefined
   try {
-    const results = await searchAlbums(`${artist} ${title}`, 8)
-    const na = normalize(artist)
-    const nt = normalize(title)
-    const best =
-      results.find((r) => normalize(r.artistName) === na && normalize(r.collectionName).startsWith(nt)) ??
-      results.find((r) => normalize(r.artistName).includes(na) && normalize(r.collectionName).includes(nt))
+    const results = await searchAlbums(`${artist} ${title}`, 15)
+    const best = matchAlbum(results, artist, title)
     const url = best?.artworkUrl100 ? hiRes(best.artworkUrl100) : undefined
     await cacheSet(key, url ?? null, 30 * 86400000)
     return url
@@ -79,17 +88,12 @@ interface ItunesTrack {
  * Renvoie null si l'album n'est pas trouvé dans le catalogue Apple Music.
  */
 export async function findAlbumPreviews(artist: string, title: string): Promise<AlbumPreviews | null> {
-  const key = `previews:${normalize(artist)}|${normalize(title)}`
+  const key = `previews2:${normalize(artist)}|${normalize(title)}`
   const cached = await cacheGet<AlbumPreviews | null>(key)
   if (cached !== undefined) return cached
 
-  const results = await searchAlbums(`${artist} ${title}`, 10)
-  const na = normalize(artist)
-  const nt = normalize(title)
-  const album =
-    results.find((r) => normalize(r.artistName) === na && normalize(r.collectionName) === nt) ??
-    results.find((r) => normalize(r.artistName) === na && normalize(r.collectionName).startsWith(nt)) ??
-    results.find((r) => normalize(r.artistName).includes(na) && normalize(r.collectionName).includes(nt))
+  const results = await searchAlbums(`${artist} ${title}`, 15)
+  const album = matchAlbum(results, artist, title)
   if (!album) {
     await cacheSet(key, null, 3 * 86400000)
     return null

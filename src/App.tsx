@@ -3,11 +3,13 @@ import { useEffect, useRef } from 'react'
 import { LogoMark } from './components/Logo'
 import { MiniPlayer } from './components/MiniPlayer'
 import { TabBar } from './components/TabBar'
+import { Onboarding } from './screens/onboarding/Onboarding'
 import { Toasts } from './components/ui'
 import { requestPersistence } from './lib/db'
 import { useOnline } from './lib/hooks'
 import { useApp, type Tab } from './lib/store'
 import { checkAlerts } from './services/alerts'
+import { fixCovers } from './services/coverFixer'
 import { captureSessionFromUrl } from './services/sync'
 import { AddFlow } from './screens/collection/AddFlow'
 import { CollectionScreen } from './screens/collection/CollectionScreen'
@@ -23,6 +25,8 @@ export default function App() {
   const tab = useApp((s) => s.tab)
   const openRecordId = useApp((s) => s.openRecordId)
   const motionPref = useApp((s) => s.settings.motion)
+  const themePref = useApp((s) => s.settings.theme)
+  const onboarded = useApp((s) => s.settings.onboarded)
   const online = useOnline()
   const prev = useRef(tab)
   const dir = ORDER.indexOf(tab) >= ORDER.indexOf(prev.current) ? 1 : -1
@@ -38,6 +42,7 @@ export default function App() {
       .then(() => {
         void requestPersistence()
         setTimeout(() => void checkAlerts(), 2500)
+        setTimeout(() => void fixCovers(), 4000)
       })
   }, [])
 
@@ -49,6 +54,24 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [tab])
+
+  // Thème clair / sombre (préférence ou réglage système, suivi en direct)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = () => {
+      const theme = themePref === 'system' ? (mq.matches ? 'light' : 'dark') : themePref
+      document.documentElement.dataset.theme = theme
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f4f2ee' : '#09090a')
+    }
+    apply()
+    try {
+      localStorage.setItem('vv-theme', themePref)
+    } catch {
+      /* stockage indisponible */
+    }
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [themePref])
 
   if (!ready)
     return (
@@ -91,9 +114,11 @@ export default function App() {
             </motion.main>
           </AnimatePresence>
           <AnimatePresence>{openRecordId && <RecordDetail key={openRecordId} id={openRecordId} />}</AnimatePresence>
+          <div className="status-scrim" aria-hidden />
           <MiniPlayer />
           <TabBar />
           <AddFlow />
+          <AnimatePresence>{!onboarded && <Onboarding key="onb" />}</AnimatePresence>
           <Toasts />
         </div>
       </LayoutGroup>

@@ -8,11 +8,14 @@ Application web installable (PWA) pour collectionneurs de vinyles : scan de poch
 
 | Onglet | Ce qui marche |
 | --- | --- |
+| **Accueil** | Premier lancement : bienvenue animée, prénom (espace personnel, salutation), proposition de scanner un premier vinyle ou plus tard. La démo fictive reste accessible en option. |
 | **Collection** | Grille et liste de pochettes, recherche plein texte, filtres (genre, décennie, état, pressage, favoris, couleur), tri, fiche détaillée avec transition partagée, modification, suppression avec annulation, notes et rangement. |
 | **Ajout / scan** | Photo de la pochette (appareil photo ou photothèque) → lecture du code-barres éventuel → reconnaissance (Claude Vision avec votre clé, sinon OCR embarqué) → éditions vinyle Discogs → confirmation (état, prix d'achat, photo) → ajout. Code-barres en direct, saisie manuelle et recherche manuelle en secours. |
 | **Valorisation** | Valeur de la collection, prix d'achat total, plus-value, courbe par période reconstruite **uniquement** à partir d'observations datées, variation à périmètre constant, historique par disque, liens vers annonces et ventes comparables (Discogs, eBay, Leboncoin). |
 | **Découvrir** | Recommandations par style, albums manquants d'artistes possédés, éditions alternatives, pressages rares (ratio recherché/possédé), bonnes affaires de la wishlist, tendances de vos disques. Prix Discogs à la demande avec lien vers la source. |
 | **Sorties** | Fil MusicBrainz des sorties vinyles datées (artistes/labels suivis ou genres), rééditions identifiées, suivi d'album, rappel calendrier (.ics), wishlist (prix cible, date, statut, liens d'achat), centre d'alertes. |
+| **Extraits** | Écoute d'extraits de 30 s (Apple Music) depuis la fiche disque et les recommandations, mini-lecteur flottant, contrôles sur l'écran verrouillé. |
+| **Pochettes** | Pochette de l'édition exacte (Discogs, puis Cover Art Archive via le lien Discogs ↔ MusicBrainz ou le code-barres), sinon pochette de l'album sur Apple Music avec correspondance stricte artiste + titre. Vérification en arrière-plan des disques existants et choix manuel (ou photo de son exemplaire). |
 | **Profil** | Goûts (genres, artistes, labels suivis), statistiques, notifications, confidentialité, connecteurs, sauvegarde/import, compte et synchronisation (Supabase, optionnel), préférences d'animation. |
 
 ## Honnêteté des données
@@ -29,8 +32,8 @@ Application web installable (PWA) pour collectionneurs de vinyles : scan de poch
 | --- | --- | --- |
 | Discogs API | éditions, références, codes-barres, versions, prix affiché le plus bas, suggestions par état | sans clé (25 req/min) ; jeton personnel optionnel saisi dans l'app |
 | MusicBrainz | sorties datées, rééditions | sans clé (1 req/s) |
-| iTunes Search | pochettes haute définition | sans clé |
-| Cover Art Archive | pochettes des sorties | sans clé |
+| iTunes Search | pochettes d'album, extraits audio de 30 s | sans clé |
+| Cover Art Archive | pochettes exactes des éditions et des sorties | sans clé |
 | Claude (Anthropic) | reconnaissance visuelle des pochettes | **clé de l'utilisateur**, stockée sur l'appareil uniquement |
 | eBay | ventes terminées / annonces | liens ; l'API nécessite un backend et un accès partenaire (Marketplace Insights) |
 | Leboncoin | annonces | liens uniquement (pas d'API publique) |
@@ -54,6 +57,7 @@ src/
 - **Hors ligne** : l'app et les pochettes déjà vues sont mises en cache par le service worker.
 - **Performances** : `content-visibility` sur la grille, animations de mise en page désactivées au-delà de 150 disques, modules lourds (vision, OCR, code-barres) chargés à la demande.
 - **Accessibilité du mouvement** : respect de `prefers-reduced-motion`, réglage manuel dans le profil.
+- **Thèmes** : sombre et clair (Liquid Glass givré), automatique selon l'iPhone ou forcé dans Profil › Apparence. Toutes les couleurs passent par des variables (`src/styles/tokens.css`) ; accent orange « Ember ».
 
 ## Développement
 

@@ -14,6 +14,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Vinyl Vault</title>
+    <script>
+      // Applique le thème avant le premier rendu (évite un flash de couleur).
+      try {
+        var t = localStorage.getItem('vv-theme') || 'system'
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+        document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

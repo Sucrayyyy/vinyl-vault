@@ -79,6 +79,7 @@ export function ProfileScreen() {
         <Row icon="user" label="Compte & synchronisation" onClick={() => setSheet('account')} value={syncConfigured() ? (currentSession() ? 'Connecté' : 'Non connecté') : 'Local'} />
         <Row icon="download" label="Données & sauvegarde" onClick={() => setSheet('data')} />
         <Row icon="disc" label="Installer sur l’iPhone" onClick={() => setSheet('install')} value={isStandalone() ? 'Installée' : undefined} />
+        <ThemePref />
         <MotionPref />
       </Group>
 
@@ -268,6 +269,29 @@ function Privacy() {
       </Row>
       <p className="fine">Aucune donnée n’est envoyée à un serveur Vinyl Vault. Les recherches interrogent directement Discogs, MusicBrainz et Apple ; la reconnaissance visuelle, uniquement l’API Anthropic avec votre clé.</p>
     </Group>
+  )
+}
+
+function ThemePref() {
+  const theme = useApp((s) => s.settings.theme)
+  const setSettings = useApp((s) => s.setSettings)
+  return (
+    <div className="row">
+      <span className="row-icon">
+        <Icon name="eye" size={17} />
+      </span>
+      <span className="row-label">Apparence</span>
+      <Segmented
+        size="sm"
+        value={theme}
+        onChange={(v) => setSettings({ theme: v })}
+        options={[
+          { value: 'system', label: 'Auto' },
+          { value: 'light', label: 'Clair' },
+          { value: 'dark', label: 'Sombre' },
+        ]}
+      />
+    </div>
   )
 }
 

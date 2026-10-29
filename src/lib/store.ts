@@ -26,6 +26,7 @@ const defaultProfile: Profile = {
 const defaultSettings: Settings = {
   recognition: 'auto',
   motion: 'system',
+  theme: 'system',
   onboarded: false,
 }
 
@@ -70,6 +71,7 @@ interface AppState extends PersistedState {
   setProfile: (patch: Partial<Profile>) => void
   setSettings: (patch: Partial<Settings>) => void
 
+  finishOnboarding: (name: string) => void
   loadDemo: () => void
   clearDemo: () => void
   importData: (data: PersistedState) => void
@@ -112,9 +114,8 @@ export const useApp = create<AppState>()((set, get) => ({
         ready: true,
       })
     } else {
-      // Premier lancement : collection de démonstration, clairement signalée.
-      const demo = buildDemo()
-      set({ ...demo, ready: true })
+      // Premier lancement : coffre vide, l'écran d'accueil prend le relais.
+      set({ ready: true })
     }
     const tab = sessionStorage.getItem('vv-tab') as Tab | null
     if (tab) set({ tab })
@@ -181,6 +182,12 @@ export const useApp = create<AppState>()((set, get) => ({
   setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
   setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
+  finishOnboarding(name) {
+    const s = get()
+    // La démo des versions précédentes n'est pas conservée dans le nouvel espace.
+    if (s.records.length && s.records.every((r) => r.demo)) s.clearDemo()
+    set((st) => ({ profile: { ...st.profile, displayName: name.trim() }, settings: { ...st.settings, onboarded: true } }))
+  },
   loadDemo() {
     const demo = buildDemo()
     set((s) => ({
@@ -212,7 +219,7 @@ export const useApp = create<AppState>()((set, get) => ({
   },
   async resetAll() {
     for (const r of get().records) if (r.photoKey) await deletePhoto(r.photoKey)
-    set({ records: [], prices: [], wishlist: [], alerts: [], profile: defaultProfile, settings: { ...defaultSettings, onboarded: true } })
+    set({ records: [], prices: [], wishlist: [], alerts: [], profile: defaultProfile, settings: { ...defaultSettings, theme: get().settings.theme } })
     await flush()
   },
 }))

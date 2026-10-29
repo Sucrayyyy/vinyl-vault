@@ -65,6 +65,10 @@ export interface VinylRecord {
   coverUrl?: string
   /** Clé IndexedDB d'une photo prise par l'utilisateur. */
   photoKey?: string
+  /** Origine de la pochette : discogs, caa (Cover Art Archive), itunes, photo, manual. */
+  coverSource?: string
+  /** Résolution automatique de la pochette déjà tentée. */
+  coverChecked?: boolean
   /** Graine pour une pochette générée (données de démo). */
   coverSeed?: number
   discogsId?: number
@@ -170,6 +174,7 @@ export interface Settings {
   anthropicKey?: string
   recognition: 'auto' | 'ocr' | 'vision'
   motion: 'system' | 'reduced' | 'full'
+  theme: 'system' | 'light' | 'dark'
   onboarded: boolean
   lastAlertCheck?: number
 }

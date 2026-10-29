@@ -1,0 +1,329 @@
+/* ── Écran d'accueil ─────────────────────────────────── */
+.onb {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--ink-0);
+  overflow: hidden auto;
+  display: flex;
+  justify-content: center;
+}
+.onb-orbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.onb-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+}
+.onb-orb.a {
+  width: 70vw;
+  height: 70vw;
+  max-width: 460px;
+  max-height: 460px;
+  top: -12%;
+  right: -20%;
+  background: rgba(var(--accent-rgb), 0.32);
+}
+.onb-orb.b {
+  width: 60vw;
+  height: 60vw;
+  max-width: 380px;
+  max-height: 380px;
+  bottom: 8%;
+  left: -24%;
+  background: rgba(120, 140, 255, 0.16);
+}
+.onb-orb.c {
+  width: 50vw;
+  height: 50vw;
+  max-width: 320px;
+  max-height: 320px;
+  bottom: -14%;
+  right: -10%;
+  background: rgba(var(--accent-rgb), 0.14);
+}
+.onb-step {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + 28px) 24px calc(var(--safe-bottom) + 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.onb-stage {
+  position: relative;
+  height: min(46vh, 330px);
+  display: grid;
+  place-items: center;
+  margin-top: 4vh;
+}
+.onb-sleeve {
+  position: absolute;
+  z-index: 2;
+  width: min(58vw, 230px);
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: grid;
+  align-content: space-between;
+  padding: 18px;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--lg-fill), rgba(var(--glass-rgb), 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 0.5px solid var(--lg-edge);
+  box-shadow: var(--lg-light), 0 30px 60px -24px rgba(0, 0, 0, 0.6);
+}
+.onb-sleeve::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(90% 70% at 15% 0%, rgba(var(--spec), 0.22), transparent 55%),
+    radial-gradient(80% 80% at 100% 100%, rgba(var(--accent-rgb), 0.35), transparent 60%);
+}
+.onb-sleeve-text {
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--fg-2);
+}
+.onb-record {
+  position: absolute;
+  z-index: 1;
+  width: min(54vw, 214px);
+}
+.onb-copy {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+.onb-copy.left {
+  text-align: left;
+  margin-top: 8vh;
+}
+.onb-copy.left .kicker {
+  justify-content: flex-start;
+}
+.onb-title {
+  font-size: clamp(46px, 13vw, 64px);
+  line-height: 0.98;
+}
+.onb-title.small {
+  font-size: clamp(38px, 10.5vw, 52px);
+}
+.onb-word {
+  display: inline-block;
+}
+.onb-accent {
+  font-style: italic;
+  background: linear-gradient(100deg, var(--accent) 10%, var(--accent-2) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.06em;
+}
+.onb-lead {
+  color: var(--fg-2);
+  font-size: 16px;
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 0 auto;
+}
+.onb-copy.left .onb-lead {
+  margin: 0;
+}
+.onb-cta {
+  margin-top: auto;
+}
+.onb-form {
+  gap: 32px;
+}
+.onb-input {
+  position: relative;
+  display: block;
+}
+.onb-input input {
+  width: 100%;
+  background: none;
+  border: 0;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 44px;
+  color: var(--fg-1);
+  padding: 8px 0 14px;
+}
+.onb-input input::placeholder {
+  color: var(--fg-4);
+}
+.onb-input-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.5);
+}
+.onb-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.onb-actions .btn-accent {
+  flex: 1;
+}
+.onb-scan-card {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: var(--r-xl);
+  position: relative;
+  isolation: isolate;
+  background: var(--lg-fill);
+  border: 0.5px solid var(--lg-edge);
+  box-shadow: var(--lg-light), var(--lg-depth);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  color: var(--fg-2);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.onb-scan-frame {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--accent);
+  border: 1.5px dashed rgba(var(--accent-rgb), 0.6);
+  background: rgba(var(--accent-rgb), 0.07);
+}
+.onb-scan-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+.onb-stack {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+.onb-demo {
+  font-size: 13.5px;
+  color: var(--fg-3);
+  padding: 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+}
+
+/* ── Salutation & barre d'état ───────────────────────── */
+.greeting {
+  font-size: 15px;
+  color: var(--fg-2);
+  margin-bottom: -10px;
+}
+.greeting em {
+  font-family: var(--font-display);
+  font-size: 19px;
+  color: var(--accent);
+}
+/* En mode clair, le texte blanc de la barre d'état iOS reste lisible */
+.status-scrim {
+  display: none;
+}
+:root[data-theme='light'] .status-scrim {
+  display: block;
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-top);
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(28, 22, 16, 0.55), rgba(28, 22, 16, 0.25));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* ── Choix de pochette ───────────────────────────────── */
+.action-grid.two > .action-tile:last-child {
+  grid-column: auto;
+  grid-template-columns: none;
+  align-items: end;
+}
+.action-grid.two > .action-tile:last-child > svg {
+  grid-row: auto;
+  margin-bottom: auto;
+}
+.action-grid.two .action-tile {
+  min-height: 104px;
+}
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 12px;
+}
+.cover-option {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  justify-items: start;
+}
+.cover-option-img {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--ink-3);
+  box-shadow: var(--shadow-cover);
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 0.2s;
+}
+.cover-option.is-current .cover-option-img {
+  outline-color: var(--accent);
+}
+.cover-option-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cover-option-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.cover-option-label {
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.onb-title .onb-word + .onb-word {
+  margin-left: 0.24em;
+}

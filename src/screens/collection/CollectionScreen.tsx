@@ -114,6 +114,7 @@ export function CollectionScreen() {
         </div>
       </header>
 
+      <Greeting />
       <div className="hero-title">
         <h1 className="display">Collection</h1>
         <span className="hero-count mono">
@@ -301,6 +302,18 @@ export function CollectionScreen() {
         </div>
       </Sheet>
     </div>
+  )
+}
+
+function Greeting() {
+  const name = useApp((s) => s.profile.displayName.split(' ')[0])
+  if (!name) return null
+  const h = new Date().getHours()
+  const hello = h < 5 || h >= 18 ? 'Bonsoir' : 'Bonjour'
+  return (
+    <motion.p className="greeting" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+      {hello}, <em>{name}</em>
+    </motion.p>
   )
 }
 

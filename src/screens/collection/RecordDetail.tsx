@@ -14,6 +14,7 @@ import { BASIS_LABEL, estimate } from '../../lib/valuation'
 import { getMasterVersions, masterUrl, releaseUrl } from '../../services/discogs'
 import { describeError } from '../../services/http'
 import { CONNECTORS, refreshRecordPrices } from '../../services/market'
+import { CoverPicker } from './CoverPicker'
 import { RecordForm, type Draft } from './RecordForm'
 
 export const KIND_LABEL: Record<PriceKind, string> = {
@@ -55,6 +56,7 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
   const [adding, setAdding] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pickingCover, setPickingCover] = useState(false)
 
   const prices = useMemo(() => allPrices.filter((p) => p.recordId === rec.id).sort((a, b) => b.at - a.at), [allPrices, rec.id])
   const series = useMemo(() => {
@@ -112,6 +114,7 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
           <IconButton icon="back" label="Retour" onClick={onClose} />
           <div className="detail-bar-actions">
             <IconButton icon="heart" label={rec.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} active={!!rec.favorite} onClick={() => updateRecord(rec.id, { favorite: !rec.favorite })} />
+            <IconButton icon="image" label="Changer la pochette" onClick={() => setPickingCover(true)} />
             <IconButton icon="edit" label="Modifier" onClick={() => setEditing(true)} />
           </div>
         </header>
@@ -292,6 +295,7 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
       </div>
 
       <EditSheet rec={rec} open={editing} onClose={() => setEditing(false)} />
+      <CoverPicker rec={rec} open={pickingCover} onClose={() => setPickingCover(false)} />
       <AddPriceSheet rec={rec} open={adding} onClose={() => setAdding(false)} />
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Supprimer ce disque ?">
         <p className="fine">

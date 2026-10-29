@@ -17,7 +17,7 @@ import {
   type DgSearchResult,
 } from '../../services/discogs'
 import { describeError } from '../../services/http'
-import { findArtwork } from '../../services/itunes'
+import { bestCover } from '../../services/covers'
 import { refreshRecordPrices } from '../../services/market'
 import { detectBarcode } from '../../services/recognition/barcode'
 import { readCoverText } from '../../services/recognition/ocr'
@@ -178,7 +178,18 @@ function Flow({ onClose }: { onClose: () => void }) {
         }
       }
       const d = releaseToDraft(rel, masterYear)
-      if (!d.coverUrl) d.coverUrl = r.cover_image || (await findArtwork(d.artist, d.title))
+      if (d.coverUrl) {
+        d.coverSource = 'discogs'
+        d.coverChecked = true
+      } else {
+        // Pochette de cette édition précise (Cover Art Archive), sinon de l'album (Apple Music).
+        const c = await bestCover(d)
+        if (c) {
+          d.coverUrl = c.url
+          d.coverSource = c.source
+          d.coverChecked = c.exact
+        }
+      }
       setDraft(d)
       setUsePhotoCover(!d.coverUrl && !!photo)
       setStep('confirm')
@@ -214,7 +225,7 @@ function Flow({ onClose }: { onClose: () => void }) {
         toast('Photo non enregistrée (stockage plein ?)', 'warn')
       }
     }
-    const rec = addRecord({ ...draft, photoKey, coverUrl: usePhotoCover ? undefined : draft.coverUrl })
+    const rec = addRecord({ ...draft, photoKey, coverUrl: usePhotoCover ? undefined : draft.coverUrl, coverSource: usePhotoCover ? 'photo' : draft.coverSource })
     haptic(18)
     setAdded(rec.id)
     setStep('done')
