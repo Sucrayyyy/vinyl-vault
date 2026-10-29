@@ -1,0 +1,192 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--ink-0);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ink-0);
+  color: var(--fg-1);
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+body.has-sheet,
+body.has-detail {
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum', 'zero';
+  letter-spacing: -0.01em;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--fg-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.muted {
+  color: var(--fg-3);
+}
+.small {
+  font-size: 12px;
+}
+.center {
+  text-align: center;
+  justify-content: center;
+}
+.block {
+  display: block;
+}
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.mt-6 {
+  margin-top: 6px;
+}
+.mt-8 {
+  margin-top: 8px;
+}
+.mt-12 {
+  margin-top: 12px;
+}
+.clamp-1 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fine {
+  font-size: var(--t-small);
+  color: var(--fg-3);
+  line-height: 1.5;
+}
+
+.lead {
+  color: var(--fg-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.link {
+  color: var(--accent);
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+/* Réduction des animations : coupe les boucles décoratives */
+html[data-motion='reduced'] .vinyl-spin,
+html[data-motion='reduced'] .logo-spin,
+html[data-motion='reduced'] .skeleton::after,
+html[data-motion='reduced'] .scan-sweep,
+html[data-motion='reduced'] .scanner-line {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) * {
+    scroll-behavior: auto !important;
+  }
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--ink-0);
+}
+
+.logo-spin {
+  animation: spin 6s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,86 @@
+/* ─────────────────────────────────────────────────────────────
+   VINYL VAULT — Design tokens
+   Monochrome graphite · accent « Signal » (vert acide) · chrome Y2K
+   ───────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+
+  /* Neutres graphite (du plus profond au plus clair) */
+  --ink-0: #09090a;
+  --ink-1: #0f0f11;
+  --ink-2: #151518;
+  --ink-3: #1c1c20;
+  --ink-4: #26262b;
+  --ink-5: #34343a;
+
+  --fg-1: #f3f3ef;
+  --fg-2: #b4b4b0;
+  --fg-3: #7c7c7f;
+  --fg-4: #55555a;
+
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Accent Signal */
+  --accent: #d4ff3a;
+  --accent-soft: rgba(212, 255, 58, 0.14);
+  --accent-ink: #0b0d02;
+
+  /* Sémantique */
+  --up: #8ef0a7;
+  --down: #ff8a7a;
+  --warn: #ffcf6b;
+  --info: #9ec5ff;
+
+  /* Chrome (logo, détails Y2K) */
+  --chrome: linear-gradient(180deg, #f6f6f3 0%, #a3a3a8 48%, #5d5d62 52%, #e4e4e0 100%);
+
+  /* Verre liquide */
+  --glass-bg: rgba(30, 30, 34, 0.58);
+  --glass-bg-strong: rgba(24, 24, 28, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(22px) saturate(170%);
+
+  /* Typographie */
+  --font-display: 'Instrument Serif', 'Times New Roman', serif;
+  --font-ui: 'Inter Tight Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --t-hero: clamp(44px, 12vw, 56px);
+  --t-h1: 34px;
+  --t-h2: 24px;
+  --t-h3: 18px;
+  --t-body: 15px;
+  --t-small: 13px;
+  --t-micro: 10.5px;
+
+  /* Grille 4 pt */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --gutter: 20px;
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 48px -16px rgba(0, 0, 0, 0.75);
+  --shadow-cover: 0 1px 1px rgba(0, 0, 0, 0.5), 0 10px 24px -10px rgba(0, 0, 0, 0.85);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: 64px;
+}
