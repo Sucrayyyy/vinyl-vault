@@ -104,6 +104,7 @@ export const CoverArt = memo(function CoverArt({
   const [failed, setFailed] = useState(false)
   const [found, setFound] = useState<string>()
   const [loaded, setLoaded] = useState(false)
+  const [lookedUp, setLookedUp] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -114,7 +115,9 @@ export const CoverArt = memo(function CoverArt({
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
           io.disconnect()
-          findArtwork(src.artist, src.title).then((u) => u && setFound(u))
+          findArtwork(src.artist, src.title)
+            .then((u) => u && setFound(u))
+            .finally(() => setLookedUp(true))
         }
       },
       { rootMargin: '200px' },
@@ -126,9 +129,13 @@ export const CoverArt = memo(function CoverArt({
   const url = photo ?? (!failed ? src.coverUrl ?? found : undefined)
   const seed = src.coverSeed ?? hash(src.artist + src.title)
 
+  // Pochette générée uniquement sans image réelle (jamais en surimpression d'une vraie pochette).
+  const waitingLookup = lookup && !found && !src.coverUrl && !src.photoKey && !lookedUp
+  const waitingPhoto = !!src.photoKey && !photo
+  const generated = !url && !waitingLookup && !waitingPhoto
   return (
-    <div ref={ref} className={`cover ${className}`}>
-      <Generated artist={src.artist} title={src.title} seed={seed} />
+    <div ref={ref} className={`cover ${className} ${(url && !loaded) || (!url && !generated) ? 'is-loading' : ''}`}>
+      {generated && <Generated artist={src.artist} title={src.title} seed={seed} />}
       {url && (
         <img
           src={url}

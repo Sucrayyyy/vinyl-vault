@@ -6,7 +6,7 @@ import { cacheGet, cacheSet } from '../lib/db'
 import { useApp } from '../lib/store'
 import type { Condition, Pressing, Track, VinylRecord } from '../lib/types'
 import { DISCOGS_CONDITION } from '../lib/types'
-import { getJSON, queued, withRetry } from './http'
+import { getJSON, windowed, withRetry } from './http'
 
 const API = 'https://api.discogs.com'
 
@@ -25,7 +25,8 @@ function call<T>(path: string, params: Record<string, string | number | undefine
       if (hit !== undefined) return hit
     }
     const data = await withRetry(() =>
-      queued('discogs', tk ? 1050 : 2500, () =>
+      // Quotas Discogs : 25 requêtes/min sans jeton, 60 avec (marge de sécurité incluse).
+      windowed('discogs', tk ? 55 : 23, 60000, () =>
         getJSON<T>(url, tk ? { headers: { Authorization: `Discogs token=${tk}` } } : {}),
       ),
     )
@@ -258,4 +259,28 @@ export function releaseToDraft(r: DgRelease, masterYear?: number): Omit<VinylRec
     discogsArtistId: r.artists?.[0]?.id,
     tracklist,
   }
+}
+
+/**
+ * Pochettes des éditions d'une liste de résultats, sans jeton :
+ * 1. vignettes des versions de chaque album (une requête par album, couvre la plupart des éditions) ;
+ * 2. pour les éditions restantes, la fiche de l'édition (une requête chacune, à la demande).
+ */
+export async function versionThumbs(masterIds: number[]): Promise<Map<number, string>> {
+  const out = new Map<number, string>()
+  for (const id of [...new Set(masterIds)].slice(0, 6)) {
+    try {
+      const v = await call<{ versions: DgVersion[] }>(`/masters/${id}/versions`, { per_page: 100, format: 'Vinyl' }, 24 * 3600000)
+      for (const x of v.versions) if (x.thumb) out.set(x.id, x.thumb)
+    } catch {
+      /* on passera par la fiche de l'édition */
+    }
+  }
+  return out
+}
+
+export async function releaseCover(id: number): Promise<string | undefined> {
+  const r = await getRelease(id)
+  const img = r.images?.find((i) => i.type === 'primary') ?? r.images?.[0]
+  return img?.uri150 || img?.uri
 }

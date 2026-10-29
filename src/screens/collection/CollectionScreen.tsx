@@ -191,10 +191,6 @@ export function CollectionScreen() {
         </Empty>
       ) : (
         <>
-          <div className="list-meta mono">
-            {list.length !== records.length ? `${list.length} résultat${list.length > 1 ? 's' : ''} · ` : ''}
-            Tri : {SORTS.find((s) => s.value === sort)?.label}
-          </div>
           <motion.div className={view === 'grid' ? 'record-grid' : 'record-list'} layout={list.length <= 150}>
             <AnimatePresence initial={false}>
               {list.map((r, i) => (

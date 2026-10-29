@@ -88,12 +88,20 @@ interface ItunesTrack {
  * Renvoie null si l'album n'est pas trouvé dans le catalogue Apple Music.
  */
 export async function findAlbumPreviews(artist: string, title: string): Promise<AlbumPreviews | null> {
-  const key = `previews2:${normalize(artist)}|${normalize(title)}`
+  const key = `previews3:${normalize(artist)}|${normalize(title)}`
   const cached = await cacheGet<AlbumPreviews | null>(key)
   if (cached !== undefined) return cached
 
   const results = await searchAlbums(`${artist} ${title}`, 15)
-  const album = matchAlbum(results, artist, title)
+  const na = normalize(artist)
+  const nt = cleanTitle(title)
+  const album =
+    matchAlbum(results, artist, title) ??
+    results.find((r) => {
+      const ra = normalize(r.artistName)
+      const rt = cleanTitle(r.collectionName)
+      return (ra === na || ra.includes(na) || na.includes(ra)) && (rt.startsWith(nt) || nt.startsWith(rt))
+    })
   if (!album) {
     await cacheSet(key, null, 3 * 86400000)
     return null

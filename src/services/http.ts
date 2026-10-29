@@ -48,6 +48,29 @@ function lane(name: string, minInterval: number): Lane {
   return l
 }
 
+/**
+ * File à fenêtre glissante : au plus `max` appels par `windowMs`, sans espacement forcé.
+ * Permet de charger rapidement une rafale (ex. pochettes) tout en respectant le quota.
+ */
+const windows = new Map<string, { stamps: number[]; chain: Promise<unknown> }>()
+export function windowed<T>(name: string, max: number, windowMs: number, fn: () => Promise<T>): Promise<T> {
+  let w = windows.get(name)
+  if (!w) windows.set(name, (w = { stamps: [], chain: Promise.resolve() }))
+  const lane = w
+  const run = lane.chain.then(async () => {
+    for (;;) {
+      const now = Date.now()
+      lane.stamps = lane.stamps.filter((t) => now - t < windowMs)
+      if (lane.stamps.length < max) break
+      await sleep(lane.stamps[0] + windowMs - now + 50)
+    }
+    lane.stamps.push(Date.now())
+    await sleep(120)
+  })
+  lane.chain = run.catch(() => undefined)
+  return run.then(fn)
+}
+
 /** Exécute `fn` dans la file `name`, en espaçant les appels d'au moins `minInterval` ms. */
 export function queued<T>(name: string, minInterval: number, fn: () => Promise<T>): Promise<T> {
   const l = lane(name, minInterval)

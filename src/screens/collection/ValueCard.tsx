@@ -41,11 +41,18 @@ export function ValueCard() {
             <div className="kicker">Valeur estimée {sum.demo && <Badge tone="demo">fictive</Badge>}</div>
             <div className="value-big">{sum.covered ? <AnimatedNumber value={sum.total} format={(n) => fmt(n)} /> : '—'}</div>
             <div className="value-sub mono">
-              {sum.covered}/{records.length} disques estimés
+              {delta != null ? (
+                <span className={delta >= 0 ? 'up' : 'down'}>
+                  {delta >= 0 ? '+' : '−'}
+                  {fmt(Math.abs(delta))} depuis l’achat
+                </span>
+              ) : (
+                `${sum.covered}/${records.length} disques estimés`
+              )}
               {change && (
                 <span className={change.pct >= 0 ? 'up' : 'down'}>
                   {' '}
-                  · {pct(change.pct)} à périmètre constant
+                  · {pct(change.pct)} ({period === 'TOUT' ? 'total' : period})
                 </span>
               )}
             </div>
@@ -55,25 +62,8 @@ export function ValueCard() {
         {history.length >= 2 ? (
           <MiniSpark values={history.map((h) => h.value)} />
         ) : (
-          <p className="value-note">
-            {sum.covered
-              ? 'L’historique se construit à chaque actualisation des prix : aucune courbe n’est extrapolée.'
-              : 'Aucune donnée de prix pour l’instant. Associez vos disques à une édition Discogs et actualisez les prix.'}
-          </p>
+          !sum.covered && <p className="value-note">Les prix apparaissent pour les disques identifiés via Discogs.</p>
         )}
-        <div className="value-card-foot">
-          <div>
-            <span className="kicker">Prix d’achat</span>
-            <span className="mono">{sum.purchaseCovered ? fmt(sum.purchaseTotal) : '—'}</span>
-          </div>
-          <div>
-            <span className="kicker">Plus-value</span>
-            <span className={`mono ${delta == null ? '' : delta >= 0 ? 'up' : 'down'}`}>{delta == null ? '—' : `${delta >= 0 ? '+' : '−'}${fmt(Math.abs(delta))}`}</span>
-          </div>
-        </div>
-        <div onClick={(e) => e.stopPropagation()}>
-          <Segmented size="sm" value={period} onChange={setPeriod} options={(['1M', '3M', '1A', 'TOUT'] as Period[]).map((p) => ({ value: p, label: p === 'TOUT' ? 'Tout' : p }))} />
-        </div>
       </motion.div>
       <ValueSheet open={open} onClose={() => setOpen(false)} period={period} setPeriod={setPeriod} />
     </>

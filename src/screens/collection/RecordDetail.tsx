@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ValueChart } from '../../components/Chart'
 import { CoverArt } from '../../components/CoverArt'
 import { Previews } from '../../components/Previews'
+import { usePlayer } from '../../lib/player'
+import { findAlbumPreviews } from '../../services/itunes'
 import { Icon } from '../../components/Icon'
 import { Badge, Button, Chip, DemoBadge, ExternalLink, Field, IconButton, Segmented, Sheet, Skeleton, softSpring, spring } from '../../components/ui'
 import { deletePhoto } from '../../lib/db'
@@ -137,9 +139,8 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
               {rec.pressing === 'original' && <Badge tone="accent">Pressage original</Badge>}
               {rec.pressing === 'reissue' && <Badge>Réédition</Badge>}
               {rec.color && <Badge tone="info">{rec.color}</Badge>}
-              {(rec.discs ?? 1) > 1 && <Badge>{rec.discs} disques</Badge>}
-              {rec.mediaCondition && <Badge>Disque {rec.mediaCondition}</Badge>}
             </div>
+            {!rec.demo && <ListenButton artist={rec.artist} title={rec.title} />}
           </div>
 
           <Previews artist={rec.artist} title={rec.title} demo={rec.demo} />
@@ -152,7 +153,6 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
                 <div className="value-big small">{est.value != null ? fmt(est.value) : 'Indisponible'}</div>
                 <div className="value-sub mono">
                   {BASIS_LABEL[est.basis]}
-                  {est.confidence !== 'aucune' && ` · confiance ${est.confidence}`}
                   {est.at && ` · ${relativeDays(est.at)}`}
                 </div>
               </div>
@@ -166,13 +166,8 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
                 </div>
               )}
             </div>
-            {est.basis === 'asking-low' && <p className="fine">Indicatif : basé sur le prix le plus bas actuellement demandé, tous états confondus — pas sur une vente conclue.</p>}
-            {est.basis === 'none' && (
-              <p className="fine">
-                {rec.discogsId ? 'Aucune observation de prix pour cette édition. Actualisez ou ajoutez une vente que vous avez constatée.' : 'Associez ce disque à une édition Discogs (via le scan) ou saisissez une observation de prix.'}
-              </p>
-            )}
-            {series.length >= 2 && <ValueChart points={series} format={(n) => fmt(n)} height={140} />}
+            {est.basis === 'asking-low' && <p className="fine">Indicatif : prix demandé le plus bas, pas une vente conclue.</p>}
+            {series.length >= 2 && <ValueChart points={series} format={(n) => fmt(n)} height={130} />}
             <div className="btn-row">
               <Button variant="glass" size="sm" icon="refresh" onClick={refresh} busy={refreshing} disabled={!rec.discogsId || rec.demo}>
                 Actualiser
@@ -181,112 +176,85 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
                 Ajouter un prix
               </Button>
             </div>
-          </section>
-
-          {/* Historique des observations */}
-          {prices.length > 0 && (
-            <section className="panel">
-              <div className="kicker">Historique des observations</div>
-              <ul className="obs-list">
-                {prices.map((p) => (
-                  <li key={p.id} className="obs">
-                    <span className={`basis-dot basis-${p.kind === 'asking' ? 'asking-low' : p.kind}`} />
-                    <div className="obs-text">
-                      <span>
-                        {KIND_LABEL[p.kind]}
-                        {p.condition && <span className="muted"> · {p.condition}</span>}
-                        {p.count != null && <span className="muted"> · {p.count} annonce{p.count > 1 ? 's' : ''}</span>}
-                      </span>
-                      <span className="mono muted">
-                        {SOURCE_LABEL[p.source]} · {dateFmt(p.at)}
-                      </span>
-                    </div>
-                    <span className="mono obs-value">{fmt(p.value, p.currency, true)}</span>
-                    {p.url ? (
-                      <a className="obs-link" href={p.url} target="_blank" rel="noopener noreferrer" aria-label="Voir la source">
-                        <Icon name="external" size={15} />
-                      </a>
-                    ) : (
-                      <span className="obs-link" />
-                    )}
-                    {!p.demo && (
-                      <button type="button" className="obs-del" aria-label="Supprimer cette observation" onClick={() => removePrice(p.id)}>
-                        <Icon name="close" size={14} />
-                      </button>
-                    )}
-                  </li>
+            <Disclosure label="Historique et annonces comparables">
+              {prices.length > 0 && (
+                <ul className="obs-list">
+                  {prices.map((p) => (
+                    <li key={p.id} className="obs">
+                      <span className={`basis-dot basis-${p.kind === 'asking' ? 'asking-low' : p.kind}`} />
+                      <div className="obs-text">
+                        <span>
+                          {KIND_LABEL[p.kind]}
+                          {p.condition && <span className="muted"> · {p.condition}</span>}
+                          {p.count != null && <span className="muted"> · {p.count} annonce{p.count > 1 ? 's' : ''}</span>}
+                        </span>
+                        <span className="mono muted">
+                          {SOURCE_LABEL[p.source]} · {dateFmt(p.at)}
+                        </span>
+                      </div>
+                      <span className="mono obs-value">{fmt(p.value, p.currency, true)}</span>
+                      {p.url ? (
+                        <a className="obs-link" href={p.url} target="_blank" rel="noopener noreferrer" aria-label="Voir la source">
+                          <Icon name="external" size={15} />
+                        </a>
+                      ) : (
+                        <span className="obs-link" />
+                      )}
+                      {!p.demo && (
+                        <button type="button" className="obs-del" aria-label="Supprimer cette observation" onClick={() => removePrice(p.id)}>
+                          <Icon name="close" size={14} />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="link-grid">
+                {CONNECTORS.map((c) => (
+                  <div key={c.id} className="link-card">
+                    <span className="link-card-name">{c.name}</span>
+                    <ExternalLink href={c.listingsUrl(rec)}>Annonces</ExternalLink>
+                    {c.soldUrl?.(rec) && <ExternalLink href={c.soldUrl(rec)!}>Ventes</ExternalLink>}
+                  </div>
                 ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Annonces comparables */}
-          <section className="panel">
-            <div className="kicker">Annonces et ventes comparables</div>
-            <div className="link-grid">
-              {CONNECTORS.map((c) => (
-                <div key={c.id} className="link-card">
-                  <span className="link-card-name">{c.name}</span>
-                  <ExternalLink href={c.listingsUrl(rec)}>Annonces</ExternalLink>
-                  {c.soldUrl?.(rec) && <ExternalLink href={c.soldUrl(rec)!}>Ventes</ExternalLink>}
-                </div>
-              ))}
-            </div>
-            <p className="fine">Les recherches sont pré-remplies avec l’artiste, le titre et la référence. Vérifiez l’édition exacte et l’état avant de comparer.</p>
+              </div>
+            </Disclosure>
           </section>
 
-          {/* Fiche édition */}
+          {/* Fiche */}
           <section className="panel">
-            <div className="kicker">Édition</div>
+            <div className="kicker">Fiche</div>
             <dl className="spec">
               <Spec k="Label" v={rec.label} />
               <Spec k="Référence" v={rec.catno} mono />
               <Spec k="Année" v={rec.year} />
               <Spec k="Pays" v={rec.country} />
-              <Spec k="Format" v={rec.formatText} />
-              <Spec k="Couleur" v={rec.color ?? (rec.formatText ? 'Noir (standard)' : undefined)} />
-              <Spec k="Disques" v={rec.discs} />
-              <Spec k="Code-barres" v={rec.barcode} mono />
-              <Spec k="Genres" v={[...rec.genres, ...rec.styles].join(', ') || undefined} />
-            </dl>
-            {rec.discogsId && (
-              <div className="btn-row">
-                <ExternalLink href={releaseUrl(rec.discogsId)}>Fiche Discogs</ExternalLink>
-                {rec.masterId && <ExternalLink href={masterUrl(rec.masterId)}>Toutes les éditions</ExternalLink>}
-              </div>
-            )}
-          </section>
-
-          <section className="panel">
-            <div className="kicker">État & achat</div>
-            <dl className="spec">
-              <Spec k="Disque" v={rec.mediaCondition && `${rec.mediaCondition} — ${CONDITION_LABELS[rec.mediaCondition]}`} />
-              <Spec k="Pochette" v={rec.sleeveCondition && `${rec.sleeveCondition} — ${CONDITION_LABELS[rec.sleeveCondition]}`} />
+              <Spec k="État" v={rec.mediaCondition && CONDITION_LABELS[rec.mediaCondition]} />
               <Spec k="Prix payé" v={rec.purchasePrice != null ? fmt(rec.purchasePrice, 'EUR', true) : undefined} />
-              <Spec k="Date d’achat" v={rec.purchaseDate && dateFmt(rec.purchaseDate)} />
-              <Spec k="Lieu" v={rec.purchasePlace} />
-              <Spec k="Rangement" v={rec.shelf} />
-              <Spec k="Ajouté" v={dateFmt(rec.createdAt)} />
             </dl>
-            {rec.notes && <p className="notes">{rec.notes}</p>}
+            <Disclosure label="Tous les détails">
+              <dl className="spec">
+                <Spec k="Format" v={rec.formatText} />
+                <Spec k="Disques" v={rec.discs} />
+                <Spec k="Code-barres" v={rec.barcode} mono />
+                <Spec k="Genres" v={[...rec.genres, ...rec.styles].join(', ') || undefined} />
+                <Spec k="Pochette" v={rec.sleeveCondition && CONDITION_LABELS[rec.sleeveCondition]} />
+                <Spec k="Date d’achat" v={rec.purchaseDate && dateFmt(rec.purchaseDate)} />
+                <Spec k="Lieu" v={rec.purchasePlace} />
+                <Spec k="Rangement" v={rec.shelf} />
+                <Spec k="Ajouté" v={dateFmt(rec.createdAt)} />
+              </dl>
+              {rec.notes && <p className="notes">{rec.notes}</p>}
+              {rec.discogsId && (
+                <div className="btn-row">
+                  <ExternalLink href={releaseUrl(rec.discogsId)}>Fiche Discogs</ExternalLink>
+                  {rec.masterId && <ExternalLink href={masterUrl(rec.masterId)}>Toutes les éditions</ExternalLink>}
+                </div>
+              )}
+            </Disclosure>
           </section>
 
           {rec.masterId && !rec.demo && <OtherEditions masterId={rec.masterId} currentId={rec.discogsId} artist={rec.artist} title={rec.title} />}
-
-          {rec.tracklist && rec.tracklist.length > 0 && (
-            <section className="panel">
-              <div className="kicker">Pistes</div>
-              <ol className="tracks">
-                {rec.tracklist.map((t, i) => (
-                  <li key={i}>
-                    <span className="mono muted">{t.position}</span>
-                    <span>{t.title}</span>
-                    <span className="mono muted">{t.duration}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
 
           <Button variant="danger" icon="trash" onClick={() => setConfirmDelete(true)} className="btn-block">
             Supprimer de la collection
@@ -311,6 +279,38 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
         </div>
       </Sheet>
     </motion.div>
+  )
+}
+
+function Disclosure({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="disclosure">
+      <button type="button" className="more-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <Icon name={open ? 'down' : 'chevron'} size={15} /> {label}
+      </button>
+      {open && (
+        <motion.div className="disclosure-body" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+          {children}
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+/** Lance directement le premier extrait de l'album (et enchaîne les suivants). */
+function ListenButton({ artist, title }: { artist: string; title: string }) {
+  const { data } = useAsync(() => findAlbumPreviews(artist, title), [artist, title])
+  const play = usePlayer((s) => s.play)
+  const current = usePlayer((s) => s.track)
+  const playing = usePlayer((s) => s.playing)
+  if (!data?.tracks.length) return null
+  const queue = data.tracks.map((t) => ({ id: t.id, title: t.title, artist: t.artist, album: data.album, artwork: t.artwork ?? data.artwork, previewUrl: t.previewUrl }))
+  const isThis = !!current && queue.some((q) => q.id === current.id)
+  return (
+    <Button variant="accent" icon={isThis && playing ? 'pause' : 'play'} className="listen-btn" onClick={() => (isThis ? usePlayer.getState().toggle() : play(queue[0], queue))}>
+      {isThis && playing ? 'Pause' : 'Écouter l’album'}
+    </Button>
   )
 }
 

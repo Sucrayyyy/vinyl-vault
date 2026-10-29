@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { useState } from 'react'
 import { useAsync } from '../lib/hooks'
 import { usePlayer, type PlayerTrack } from '../lib/player'
 import { findAlbumPreviews } from '../services/itunes'
@@ -20,20 +21,21 @@ export function Equalizer({ active }: { active: boolean }) {
 }
 
 /** Liste des extraits d'un album, lus dans le mini-lecteur. */
-export function Previews({ artist, title, demo }: { artist: string; title: string; demo?: boolean }) {
+export function Previews({ artist, title, demo, compact }: { artist: string; title: string; demo?: boolean; compact?: boolean }) {
   const { loading, error, data, reload } = useAsync(() => (demo ? Promise.resolve(null) : findAlbumPreviews(artist, title)), [artist, title, demo])
   const current = usePlayer((s) => s.track)
   const playing = usePlayer((s) => s.playing)
   const busy = usePlayer((s) => s.loading)
   const play = usePlayer((s) => s.play)
+  const [all, setAll] = useState(false)
 
   return (
     <section className="panel previews">
       <div className="panel-head">
         <div className="kicker">
-          <Icon name="play" size={13} /> Écouter des extraits
+          <Icon name="play" size={13} /> {compact ? 'Écouter pour vérifier' : 'Écouter des extraits'}
         </div>
-        {data && <span className="mono muted small">{data.tracks.length} extraits · 30 s</span>}
+        {data && !compact && <span className="mono muted small">{data.tracks.length} extraits · 30 s</span>}
       </div>
 
       {demo ? (
@@ -56,7 +58,7 @@ export function Previews({ artist, title, demo }: { artist: string; title: strin
       ) : (
         <>
           <ol className="preview-list">
-            {data.tracks.map((t, i) => {
+            {(compact ? data.tracks.slice(0, 4) : all ? data.tracks : data.tracks.slice(0, 5)).map((t, i) => {
               const pt: PlayerTrack = { id: t.id, title: t.title, artist: t.artist, album: data.album, artwork: t.artwork ?? data.artwork, previewUrl: t.previewUrl }
               const isCur = current?.id === t.id
               const queue = data.tracks.map<PlayerTrack>((x) => ({ id: x.id, title: x.title, artist: x.artist, album: data.album, artwork: x.artwork ?? data.artwork, previewUrl: x.previewUrl }))
@@ -74,10 +76,17 @@ export function Previews({ artist, title, demo }: { artist: string; title: strin
               )
             })}
           </ol>
-          <p className="fine">
-            Extraits de 30 s fournis par Apple Music, d’après l’édition numérique : l’ordre peut différer de votre pressage.{' '}
-            {data.url && <ExternalLink href={data.url}>Album complet</ExternalLink>}
-          </p>
+          {!compact && !all && data.tracks.length > 5 && (
+            <button type="button" className="more-toggle" onClick={() => setAll(true)}>
+              <Icon name="down" size={15} /> Voir les {data.tracks.length} extraits
+            </button>
+          )}
+          {!compact && (
+            <p className="fine">
+              Extraits de 30 s (Apple Music).{' '}
+              {data.url && <ExternalLink href={data.url}>Album complet</ExternalLink>}
+            </p>
+          )}
         </>
       )}
     </section>

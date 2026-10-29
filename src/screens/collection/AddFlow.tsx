@@ -1,43 +1,38 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CoverArt } from '../../components/CoverArt'
-import { Icon, type IconName } from '../../components/Icon'
-import { Badge, Button, Field, Sheet, Skeleton, softSpring, spring } from '../../components/ui'
+import { Icon } from '../../components/Icon'
+import { Previews } from '../../components/Previews'
+import { Badge, Button, Chip, Field, Sheet, Skeleton, softSpring, spring } from '../../components/ui'
 import { putPhoto } from '../../lib/db'
+import { useDebounced } from '../../lib/hooks'
 import { compressImage } from '../../lib/image'
 import { useApp } from '../../lib/store'
+import type { Condition } from '../../lib/types'
 import { haptic, uid } from '../../lib/util'
-import {
-  describeFormat,
-  getMaster,
-  getRelease,
-  releaseToDraft,
-  searchReleases,
-  splitTitle,
-  type DgSearchResult,
-} from '../../services/discogs'
-import { describeError } from '../../services/http'
 import { bestCover } from '../../services/covers'
+import { getMaster, getRelease, releaseToDraft, searchReleases, type DgSearchResult } from '../../services/discogs'
+import { describeError } from '../../services/http'
 import { refreshRecordPrices } from '../../services/market'
 import { detectBarcode } from '../../services/recognition/barcode'
-import { readCoverText } from '../../services/recognition/ocr'
+import { queriesFrom, rankAlbums, type AlbumCandidate } from '../../services/recognition/match'
+import { readCover, warmUpOcr } from '../../services/recognition/ocr'
 import { BarcodeScanner } from './BarcodeScanner'
+import { EditionsList } from './EditionsList'
 import { VinylDisc } from './RecordDetail'
 import { emptyDraft, RecordForm, type Draft } from './RecordForm'
 
-type Step = 'choose' | 'analyzing' | 'barcode' | 'results' | 'confirm' | 'done'
+type Step = 'home' | 'analyzing' | 'albums' | 'editions' | 'confirm' | 'done' | 'barcode'
 
-interface Guess {
-  method: 'vision' | 'ocr' | 'barcode' | 'manual'
-  artist: string
-  title: string
-  query: string
-  confidence?: number
-  barcode?: string
-  catno?: string
-}
+const STAGES = ['Lecture de la pochette', 'Recherche des albums', 'Comparaison des pochettes']
 
-const STAGES = ['Lecture de la pochette', 'Identification de l’album', 'Recherche des éditions']
+/** États simplifiés (échelle Goldmine en dessous). */
+const QUICK_CONDITIONS: { value: Condition; label: string }[] = [
+  { value: 'NM', label: 'Comme neuf' },
+  { value: 'VG+', label: 'Très bon' },
+  { value: 'VG', label: 'Bon' },
+  { value: 'G', label: 'Usé' },
+]
 
 export function AddFlow() {
   const open = useApp((s) => s.addOpen)
@@ -58,48 +53,60 @@ function Flow({ onClose }: { onClose: () => void }) {
   const setTab = useApp((s) => s.setTab)
   const toast = useApp((s) => s.toast)
 
-  const [step, setStep] = useState<Step>('choose')
+  const [step, setStep] = useState<Step>('home')
+  const [query, setQuery] = useState('')
+  const q = useDebounced(query.trim(), 550)
+  const [results, setResults] = useState<DgSearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [error, setError] = useState<string>()
   const [photo, setPhoto] = useState<Blob>()
   const [photoUrl, setPhotoUrl] = useState<string>()
   const [stage, setStage] = useState(0)
-  const [progress, setProgress] = useState<number>()
-  const [guess, setGuess] = useState<Guess>({ method: 'manual', artist: '', title: '', query: '' })
-  const [results, setResults] = useState<DgSearchResult[]>([])
-  const [page, setPage] = useState({ page: 1, pages: 1 })
-  const [searching, setSearching] = useState(false)
-  const [error, setError] = useState<string>()
+  const [albums, setAlbums] = useState<AlbumCandidate[]>([])
+  const [album, setAlbum] = useState<{ artist: string; title: string; artwork?: string } | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft())
   const [loadingRelease, setLoadingRelease] = useState<number | null>(null)
   const [usePhotoCover, setUsePhotoCover] = useState(false)
+  const [more, setMore] = useState(false)
   const [added, setAdded] = useState<string>()
   const runId = useRef(0)
+  const searchId = useRef(0)
 
+  useEffect(() => {
+    warmUpOcr()
+  }, [])
   useEffect(() => () => {
     if (photoUrl) URL.revokeObjectURL(photoUrl)
   }, [photoUrl])
 
-  const visionAvailable = !!settings.anthropicKey && privacy.sendPhotosToVision && settings.recognition !== 'ocr'
-
-  const search = useCallback(async (g: Guess, p = 1) => {
+  const runSearch = useCallback(async (params: { q?: string; artist?: string; title?: string; barcode?: string }) => {
+    const id = ++searchId.current
     setSearching(true)
     setError(undefined)
     try {
-      let res
-      if (g.barcode) res = await searchReleases({ barcode: g.barcode }, p)
-      else if (g.artist && g.title) {
-        res = await searchReleases({ artist: g.artist, title: g.title }, p)
-        if (!res.results.length) res = await searchReleases({ q: `${g.artist} ${g.title}` }, p)
-      } else res = await searchReleases({ q: g.query }, p)
-      if (!res.results.length && g.catno) res = await searchReleases({ catno: g.catno }, p)
-      setResults((prev) => (p === 1 ? res.results : [...prev, ...res.results]))
-      setPage({ page: res.pagination.page, pages: res.pagination.pages })
+      let res = await searchReleases(params)
+      if (!res.results.length && params.artist && params.title) res = await searchReleases({ q: `${params.artist} ${params.title}` })
+      if (id === searchId.current) setResults(res.results)
     } catch (e) {
-      setError(describeError(e))
-      if (p === 1) setResults([])
+      if (id === searchId.current) {
+        setError(describeError(e))
+        setResults([])
+      }
     } finally {
-      setSearching(false)
+      if (id === searchId.current) setSearching(false)
     }
   }, [])
+
+  // Recherche en direct dès la saisie (accueil du parcours).
+  useEffect(() => {
+    if (step !== 'home') return
+    if (q.length < 3) {
+      setResults([])
+      return
+    }
+    const digits = q.replace(/\s/g, '')
+    void runSearch(/^\d{8,14}$/.test(digits) ? { barcode: digits } : { q })
+  }, [q, step, runSearch])
 
   const analyze = async (file?: File) => {
     if (!file) return
@@ -107,63 +114,84 @@ function Flow({ onClose }: { onClose: () => void }) {
     setError(undefined)
     setStep('analyzing')
     setStage(0)
-    setProgress(undefined)
     try {
-      const small = await compressImage(file, 1024, 0.85)
+      const small = await compressImage(file, 1400, 0.88)
       if (id !== runId.current) return
       setPhoto(small)
       setPhotoUrl(URL.createObjectURL(small))
-      setUsePhotoCover(false)
-      setStage(1)
 
-      let g: Guess | null = null
-      // 1) Code-barres éventuellement visible sur la photo (dos de pochette).
+      // Code-barres visible sur la photo : identification directe de l'édition.
       try {
         const bmp = await createImageBitmap(small)
         const code = await detectBarcode(bmp)
         bmp.close()
-        if (code) g = { method: 'barcode', artist: '', title: '', query: code, barcode: code }
+        if (code) {
+          setAlbum(null)
+          setStep('editions')
+          void runSearch({ barcode: code })
+          return
+        }
       } catch {
         /* pas de code-barres */
       }
-      // 2) Vision (clé utilisateur) si disponible.
-      if (!g && visionAvailable) {
+
+      // Vision (clé de l'utilisateur), facultative.
+      let hint: string | undefined
+      if (settings.anthropicKey && privacy.sendPhotosToVision && settings.recognition !== 'ocr') {
         const vision = await import('../../services/recognition/vision')
         try {
-          const v = await vision.identifyCover(small, settings.anthropicKey!)
-          if (v.artist && v.title && v.confidence >= 0.3) g = { method: 'vision', artist: v.artist, title: v.title, query: `${v.artist} ${v.title}`, confidence: v.confidence, catno: v.catno }
+          const v = await vision.identifyCover(small, settings.anthropicKey)
+          if (v.artist && v.title) hint = `${v.artist} ${v.title}`
         } catch (e) {
           toast(vision.describeVisionError(e), 'warn')
         }
       }
-      // 3) OCR embarqué.
-      if (!g) {
-        const lines = await readCoverText(small, (p) => id === runId.current && setProgress(p))
-        const q = lines.slice(0, 3).join(' ')
-        g = { method: 'ocr', artist: '', title: '', query: q }
+
+      // Avec la vision, le texte identifié tient lieu de lecture ; sinon OCR embarqué.
+      const ocr = hint ? { words: hint.split(' ').map((t) => ({ text: t, confidence: 99, size: 1 })), lines: [hint] } : await readCover(small)
+      if (id !== runId.current) return
+      setStage(1)
+      const queries = queriesFrom(ocr, hint)
+      setQuery(queries[0] ?? '')
+      if (!queries.length) {
+        setStep('home')
+        toast(hint ? 'Album non identifié : tapez son nom.' : 'Pas de texte lisible sur cette pochette. Essayez le code-barres ou tapez le nom.', 'warn')
+        return
       }
+      const ranked = await rankAlbums(small, ocr, queries)
       if (id !== runId.current) return
-      setGuess(g)
       setStage(2)
-      if (g.query.trim() || g.barcode) await search(g)
-      if (id !== runId.current) return
-      setStep('results')
+      if (ranked.length) {
+        setAlbums(ranked)
+        setStep('albums')
+      } else {
+        // Lecture partielle : on affiche la recherche pré-remplie (résultats en direct, modifiables).
+        setStep('home')
+        toast('Lecture partielle de la pochette : vérifiez la recherche.', 'warn')
+      }
     } catch (e) {
       if (id !== runId.current) return
       setError(e instanceof Error ? e.message : 'Analyse impossible')
-      setStep('results')
+      setStep('home')
     }
   }
 
   const onBarcode = useCallback(
     (code: string) => {
-      const g: Guess = { method: 'barcode', artist: '', title: '', query: code, barcode: code }
-      setGuess(g)
-      setStep('results')
-      void search(g)
+      setAlbum(null)
+      setStep('editions')
+      void runSearch({ barcode: code })
     },
-    [search],
+    [runSearch],
   )
+
+  const chooseAlbum = (a: AlbumCandidate) => {
+    haptic()
+    setAlbum({ artist: a.artist, title: a.title, artwork: a.artwork })
+    setResults([])
+    setStep('editions')
+    void runSearch({ artist: a.artist, title: a.title })
+  }
 
   const pick = async (r: DgSearchResult) => {
     setLoadingRelease(r.id)
@@ -182,7 +210,6 @@ function Flow({ onClose }: { onClose: () => void }) {
         d.coverSource = 'discogs'
         d.coverChecked = true
       } else {
-        // Pochette de cette édition précise (Cover Art Archive), sinon de l'album (Apple Music).
         const c = await bestCover(d)
         if (c) {
           d.coverUrl = c.url
@@ -191,7 +218,8 @@ function Flow({ onClose }: { onClose: () => void }) {
         }
       }
       setDraft(d)
-      setUsePhotoCover(!d.coverUrl && !!photo)
+      setUsePhotoCover(false)
+      setMore(false)
       setStep('confirm')
     } catch (e) {
       toast(describeError(e), 'error')
@@ -200,19 +228,23 @@ function Flow({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const manualEntry = () => {
+  /** Ajout sans édition précise : on garde l'album et sa pochette. */
+  const withoutEdition = () => {
     const d = emptyDraft()
-    d.artist = guess.artist
-    d.title = guess.title || (guess.method === 'ocr' ? '' : guess.query)
-    d.barcode = guess.barcode
+    d.artist = album?.artist ?? ''
+    d.title = album?.title ?? query
+    d.coverUrl = album?.artwork
+    d.coverSource = album?.artwork ? 'itunes' : undefined
     setDraft(d)
-    setUsePhotoCover(!!photo)
+    setUsePhotoCover(!album?.artwork && !!photo)
+    setMore(!d.artist)
     setStep('confirm')
   }
 
   const confirm = async () => {
     if (!draft.artist.trim() || !draft.title.trim()) {
-      toast('Artiste et titre sont obligatoires', 'warn')
+      setMore(true)
+      toast('Indiquez au moins l’artiste et le titre', 'warn')
       return
     }
     let photoKey: string | undefined
@@ -222,7 +254,6 @@ function Flow({ onClose }: { onClose: () => void }) {
         await putPhoto(photoKey, photo)
       } catch {
         photoKey = undefined
-        toast('Photo non enregistrée (stockage plein ?)', 'warn')
       }
     }
     const rec = addRecord({ ...draft, photoKey, coverUrl: usePhotoCover ? undefined : draft.coverUrl, coverSource: usePhotoCover ? 'photo' : draft.coverSource })
@@ -232,49 +263,77 @@ function Flow({ onClose }: { onClose: () => void }) {
     if (rec.discogsId && privacy.priceLookups) refreshRecordPrices(rec).catch(() => undefined)
   }
 
-  const duplicate = draft.discogsId ? records.find((r) => r.discogsId === draft.discogsId) : undefined
+  const restart = () => {
+    setDraft(emptyDraft())
+    setPhoto(undefined)
+    setPhotoUrl(undefined)
+    setResults([])
+    setAlbums([])
+    setAlbum(null)
+    setQuery('')
+    setStep('home')
+  }
+
+  const owned = (id: number) => records.some((x) => x.discogsId === id)
+  const duplicate = draft.discogsId ? owned(draft.discogsId) : false
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div key={step} className="flow" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={softSpring}>
-        {step === 'choose' && (
+        {step === 'home' && (
           <div className="form-stack">
-            <div className="scan-hero">
-              <VinylDisc className="scan-hero-disc" />
-              <div className="scan-hero-sleeve" />
-            </div>
-            <p className="lead">Photographiez la pochette : Vinyl Vault identifie l’album puis vous propose les éditions correspondantes.</p>
-            <div className="action-grid">
-              <label className="action-tile action-tile-primary">
-                <Icon name="camera" size={26} />
-                <span className="action-title">Photographier la pochette</span>
-                <span className="action-sub">Appareil photo</span>
-                <input type="file" accept="image/*" capture="environment" onChange={(e) => analyze(e.target.files?.[0])} />
-              </label>
-              <label className="action-tile">
-                <Icon name="image" size={24} />
-                <span className="action-title">Choisir une photo</span>
-                <span className="action-sub">Photothèque</span>
-                <input type="file" accept="image/*" onChange={(e) => analyze(e.target.files?.[0])} />
-              </label>
-              <ActionTile icon="barcode" title="Code-barres" sub="Lecture en direct" onClick={() => setStep('barcode')} />
-              <ActionTile
-                icon="search"
-                title="Recherche manuelle"
-                sub="Artiste, titre, réf."
-                onClick={() => {
-                  setGuess({ method: 'manual', artist: '', title: '', query: '' })
-                  setResults([])
-                  setStep('results')
-                }}
+            <div className="search glass-soft search-lg">
+              <Icon name="search" size={19} />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Album, artiste, référence…"
+                enterKeyHint="search"
+                autoCorrect="off"
+                aria-label="Rechercher un vinyle"
               />
+              {searching && <span className="spinner" />}
+              {query && !searching && (
+                <button type="button" className="search-clear" onClick={() => setQuery('')} aria-label="Effacer">
+                  <Icon name="close" size={14} />
+                </button>
+              )}
             </div>
-            <div className="note">
-              <Icon name={visionAvailable ? 'spark' : 'info'} size={16} />
-              {visionAvailable
-                ? 'Reconnaissance visuelle Claude activée (votre clé). La photo est envoyée à l’API Anthropic.'
-                : 'Reconnaissance par lecture du texte de la pochette, sur l’appareil. Pour identifier aussi les pochettes sans texte, ajoutez une clé dans Profil › Connecteurs.'}
-            </div>
+
+            {query.trim().length >= 3 ? (
+              <>
+                {error && <div className="note note-error">{error}</div>}
+                <EditionsList results={results} loading={searching} loadingId={loadingRelease} owned={owned} onPick={pick} />
+                {!searching && q.length >= 3 && !results.length && !error && <p className="fine center">Aucune édition vinyle trouvée. Essayez d’autres mots.</p>}
+              </>
+            ) : (
+              <>
+                <label className="scan-cta">
+                  <span className="scan-cta-icon">
+                    <Icon name="camera" size={26} />
+                  </span>
+                  <span className="scan-cta-text">
+                    <strong>Scanner une pochette</strong>
+                    <span>Photographiez le recto, bien de face</span>
+                  </span>
+                  <input type="file" accept="image/*" capture="environment" onChange={(e) => analyze(e.target.files?.[0])} />
+                </label>
+                <div className="scan-alt">
+                  <label className="scan-alt-btn">
+                    <Icon name="image" size={19} />
+                    <span>Photo</span>
+                    <input type="file" accept="image/*" onChange={(e) => analyze(e.target.files?.[0])} />
+                  </label>
+                  <button type="button" className="scan-alt-btn" onClick={() => setStep('barcode')}>
+                    <Icon name="barcode" size={19} />
+                    <span>Code-barres</span>
+                  </button>
+                </div>
+                <p className="fine center">Le code-barres au dos identifie l’édition exacte du premier coup.</p>
+                {!settings.anthropicKey && <VisionKeyCard />}
+              </>
+            )}
           </div>
         )}
 
@@ -289,149 +348,127 @@ function Flow({ onClose }: { onClose: () => void }) {
                 <li key={s} className={i < stage ? 'is-done' : i === stage ? 'is-active' : ''}>
                   <span className="stage-dot">{i < stage ? <Icon name="check" size={13} weight={2.4} /> : null}</span>
                   {s}
-                  {i === stage && i === 1 && progress != null && <span className="mono muted"> {Math.round(progress * 100)} %</span>}
                 </li>
               ))}
             </ol>
-            <Button variant="ghost" onClick={() => { runId.current++; setStep('choose') }}>
+            <Button variant="ghost" onClick={() => { runId.current++; setStep('home') }}>
               Annuler
+            </Button>
+          </div>
+        )}
+
+        {step === 'albums' && (
+          <div className="form-stack">
+            <BackLink onClick={() => setStep('home')} />
+            <div className="albums-head">
+              {photoUrl && <img src={photoUrl} alt="" className="guess-thumb" />}
+              <div>
+                <h2 className="display step-title">C’est lequel ?</h2>
+                <p className="fine">Touchez votre album.</p>
+              </div>
+            </div>
+            <div className="album-grid">
+              {albums.map((a, i) => (
+                <motion.button key={a.key} type="button" className={`album-card ${i === 0 ? 'is-best' : ''}`} onClick={() => chooseAlbum(a)} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: i * 0.04 }} whileTap={{ scale: 0.96 }}>
+                  <CoverArt src={{ artist: a.artist, title: a.title, coverUrl: a.artwork }} eager />
+                  <span className="record-title">{a.title}</span>
+                  <span className="record-artist">
+                    {a.artist}
+                    {a.year ? ` · ${a.year}` : ''}
+                  </span>
+                  {i === 0 && <Badge tone="accent">Meilleure correspondance</Badge>}
+                </motion.button>
+              ))}
+            </div>
+            <Button variant="glass" icon="search" onClick={() => setStep('home')}>
+              Aucun de ceux-là : chercher
+            </Button>
+          </div>
+        )}
+
+        {step === 'editions' && (
+          <div className="form-stack">
+            <BackLink onClick={() => setStep(albums.length ? 'albums' : 'home')} />
+            {album ? (
+              <div className="albums-head">
+                <CoverArt src={{ artist: album.artist, title: album.title, coverUrl: album.artwork }} className="guess-thumb" />
+                <div>
+                  <h2 className="display step-title">{album.title}</h2>
+                  <p className="fine">{album.artist} · choisissez votre édition</p>
+                </div>
+              </div>
+            ) : (
+              <h2 className="display step-title">Éditions trouvées</h2>
+            )}
+            {error && <div className="note note-error">{error}</div>}
+            <EditionsList results={results} loading={searching} loadingId={loadingRelease} owned={owned} onPick={pick} />
+            {!searching && !results.length && !error && <p className="fine center">Aucune édition vinyle référencée sur Discogs.</p>}
+            <Button variant="ghost" onClick={withoutEdition}>
+              Je ne sais pas : ajouter sans préciser l’édition
             </Button>
           </div>
         )}
 
         {step === 'barcode' && (
           <div className="form-stack">
-            <BackLink onClick={() => setStep('choose')} />
+            <BackLink onClick={() => setStep('home')} />
             <BarcodeScanner onCode={onBarcode} />
-          </div>
-        )}
-
-        {step === 'results' && (
-          <div className="form-stack">
-            <BackLink onClick={() => setStep('choose')} />
-            {guess.method !== 'manual' && (
-              <div className="guess">
-                {photoUrl && <img src={photoUrl} alt="" className="guess-thumb" />}
-                <div>
-                  <div className="kicker">
-                    {guess.method === 'vision' && `Identifié par vision · confiance ${Math.round((guess.confidence ?? 0) * 100)} %`}
-                    {guess.method === 'ocr' && (guess.query ? 'Texte lu sur la pochette' : 'Aucun texte lisible')}
-                    {guess.method === 'barcode' && 'Code-barres détecté'}
-                  </div>
-                  <div className="guess-text">{guess.method === 'barcode' ? <span className="mono">{guess.barcode}</span> : guess.artist ? `${guess.artist} — ${guess.title}` : guess.query || 'Précisez la recherche ci-dessous'}</div>
-                </div>
-              </div>
-            )}
-            <form
-              className="search-form"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const g: Guess = { ...guess, barcode: /^\d{8,14}$/.test(guess.query.trim()) ? guess.query.trim() : undefined, artist: '', title: '' }
-                setGuess(g)
-                void search(g)
-              }}
-            >
-              <div className="search glass-soft">
-                <Icon name="search" size={18} />
-                <input
-                  type="search"
-                  value={guess.artist && guess.title ? `${guess.artist} ${guess.title}` : guess.query}
-                  onChange={(e) => setGuess({ ...guess, artist: '', title: '', query: e.target.value })}
-                  placeholder="Artiste, album, référence ou code-barres"
-                  autoFocus={guess.method === 'manual'}
-                  enterKeyHint="search"
-                />
-              </div>
-              <Button type="submit" variant="accent" busy={searching} ariaLabel="Rechercher">
-                OK
-              </Button>
-            </form>
-
-            {error && (
-              <div className="note note-error">
-                <Icon name="alert" size={16} /> {error}
-              </div>
-            )}
-
-            {searching && results.length === 0 ? (
-              <div className="skeleton-list">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="result-skel">
-                    <Skeleton w={56} h={56} r={8} />
-                    <div style={{ flex: 1 }}>
-                      <Skeleton h={14} w="70%" />
-                      <Skeleton h={11} w="45%" className="mt-6" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : results.length > 0 ? (
-              <>
-                <div className="kicker">{results.length} édition{results.length > 1 ? 's' : ''} vinyle trouvée{results.length > 1 ? 's' : ''} sur Discogs</div>
-                <ul className="results">
-                  {results.map((r, i) => (
-                    <ResultRow key={`${r.id}-${i}`} r={r} index={i} loading={loadingRelease === r.id} owned={records.some((x) => x.discogsId === r.id)} onPick={() => pick(r)} />
-                  ))}
-                </ul>
-                {page.page < page.pages && (
-                  <Button variant="glass" onClick={() => search(guess, page.page + 1)} busy={searching}>
-                    Plus de résultats
-                  </Button>
-                )}
-              </>
-            ) : (
-              !searching &&
-              (guess.query || guess.barcode) && (
-                <div className="note">
-                  <Icon name="info" size={16} /> Aucune édition trouvée. Modifiez la recherche ou ajoutez le disque manuellement.
-                </div>
-              )
-            )}
-            <Button variant="ghost" icon="edit" onClick={manualEntry}>
-              Ajouter sans correspondance
-            </Button>
           </div>
         )}
 
         {step === 'confirm' && (
           <div className="form-stack">
-            <BackLink onClick={() => setStep('results')} label="Résultats" />
-            <div className="confirm-head">
-              <motion.div className="confirm-cover" initial={{ rotate: -4, scale: 0.9 }} animate={{ rotate: 0, scale: 1 }} transition={spring}>
+            <BackLink onClick={() => setStep(results.length ? (album || albums.length ? 'editions' : 'home') : 'home')} />
+            <div className="confirm-hero">
+              <motion.div className="confirm-cover-lg" initial={{ rotate: -3, scale: 0.92 }} animate={{ rotate: 0, scale: 1 }} transition={spring}>
                 <CoverArt src={{ artist: draft.artist || 'Artiste', title: draft.title || 'Titre', coverUrl: usePhotoCover ? photoUrl : draft.coverUrl }} eager />
               </motion.div>
-              <div>
-                <h2 className="display confirm-title">{draft.title || 'Nouveau disque'}</h2>
-                <p className="detail-artist">{draft.artist}</p>
-                <div className="badge-row">
-                  {draft.pressing === 'original' && <Badge tone="accent">Original</Badge>}
-                  {draft.pressing === 'reissue' && <Badge>Réédition</Badge>}
-                  {draft.color && <Badge tone="info">{draft.color}</Badge>}
-                  {draft.discogsId && <Badge>Discogs #{draft.discogsId}</Badge>}
-                </div>
+              <h2 className="display confirm-title">{draft.title || 'Nouveau disque'}</h2>
+              <p className="detail-artist">{draft.artist}</p>
+              <p className="mono fine center">{[draft.year, draft.country, draft.label, draft.color].filter(Boolean).join(' · ') || 'Édition non précisée'}</p>
+              {duplicate && <Badge tone="warn">Déjà dans votre collection</Badge>}
+            </div>
+
+            <div className="form-group">
+              <div className="form-label">État du disque</div>
+              <div className="chip-wrap">
+                {QUICK_CONDITIONS.map((c) => (
+                  <Chip key={c.value} active={draft.mediaCondition === c.value} onClick={() => setDraft({ ...draft, mediaCondition: draft.mediaCondition === c.value ? undefined : c.value })}>
+                    {c.label}
+                  </Chip>
+                ))}
               </div>
             </div>
-            {duplicate && (
-              <div className="note note-warn">
-                <Icon name="info" size={16} /> Cette édition est déjà dans votre collection. Vous pouvez l’ajouter à nouveau (second exemplaire).
-              </div>
-            )}
-            {photo && (
-              <label className="check-row">
-                <input type="checkbox" checked={usePhotoCover} onChange={(e) => setUsePhotoCover(e.target.checked)} />
-                <span>Utiliser ma photo comme pochette</span>
-              </label>
-            )}
-            <Field label="Artiste">
-              <input value={draft.artist} onChange={(e) => setDraft({ ...draft, artist: e.target.value })} />
+            <Field label="Prix payé (facultatif)">
+              <input inputMode="decimal" value={draft.purchasePrice ?? ''} onChange={(e) => setDraft({ ...draft, purchasePrice: e.target.value.trim() ? Number(e.target.value.replace(',', '.')) : undefined })} placeholder="€" />
             </Field>
-            <Field label="Titre">
-              <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-            </Field>
-            <RecordForm draft={draft} onChange={setDraft} compact />
+
+            {draft.artist && draft.title && <Previews artist={draft.artist} title={draft.title} compact />}
+
+            <button type="button" className="more-toggle" onClick={() => setMore((m) => !m)}>
+              <Icon name={more ? 'down' : 'chevron'} size={16} /> {more ? 'Moins de détails' : 'Plus de détails (facultatif)'}
+            </button>
+            {more && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="form-stack">
+                <Field label="Artiste">
+                  <input value={draft.artist} onChange={(e) => setDraft({ ...draft, artist: e.target.value })} />
+                </Field>
+                <Field label="Titre">
+                  <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+                </Field>
+                {photo && (
+                  <label className="check-row">
+                    <input type="checkbox" checked={usePhotoCover} onChange={(e) => setUsePhotoCover(e.target.checked)} />
+                    <span>Utiliser ma photo comme pochette</span>
+                  </label>
+                )}
+                <RecordForm draft={draft} onChange={setDraft} compact />
+              </motion.div>
+            )}
+
             <div className="sticky-cta">
               <Button variant="accent" size="lg" icon="plus" onClick={confirm} className="btn-block">
-                Ajouter à la collection
+                Ajouter à ma collection
               </Button>
             </div>
           </div>
@@ -455,16 +492,7 @@ function Flow({ onClose }: { onClose: () => void }) {
               {draft.artist} — {draft.title}
             </p>
             <div className="form-actions">
-              <Button
-                variant="glass"
-                onClick={() => {
-                  setDraft(emptyDraft())
-                  setPhoto(undefined)
-                  setPhotoUrl(undefined)
-                  setResults([])
-                  setStep('choose')
-                }}
-              >
+              <Button variant="glass" onClick={restart}>
                 Ajouter un autre
               </Button>
               <Button
@@ -485,13 +513,51 @@ function Flow({ onClose }: { onClose: () => void }) {
   )
 }
 
-function ActionTile({ icon, title, sub, onClick }: { icon: IconName; title: string; sub: string; onClick: () => void }) {
+/** Activation de la reconnaissance visuelle (clé Anthropic de l'utilisateur). */
+function VisionKeyCard() {
+  const setSettings = useApp((s) => s.setSettings)
+  const toast = useApp((s) => s.toast)
+  const [open, setOpen] = useState(false)
+  const [key, setKey] = useState('')
   return (
-    <motion.button type="button" className="action-tile" onClick={onClick} whileTap={{ scale: 0.96 }} transition={spring}>
-      <Icon name={icon} size={24} />
-      <span className="action-title">{title}</span>
-      <span className="action-sub">{sub}</span>
-    </motion.button>
+    <div className="vision-card">
+      <div className="vision-card-head">
+        <Icon name="spark" size={18} />
+        <strong>Reconnaissance visuelle</strong>
+      </div>
+      <p>
+        Sans clé, l’app lit seulement le texte des pochettes. Pour reconnaître aussi les pochettes graphiques (sans texte), ajoutez une clé API Anthropic (≈ 0,5 centime par scan,
+        stockée uniquement sur ce téléphone).
+      </p>
+      {open ? (
+        <form
+          className="search-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!key.trim().startsWith('sk-')) return toast('Clé invalide (elle commence par sk-ant-)', 'warn')
+            setSettings({ anthropicKey: key.trim(), recognition: 'auto' })
+            toast('Reconnaissance visuelle activée')
+          }}
+        >
+          <div className="search glass-soft">
+            <Icon name="key" size={17} />
+            <input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" aria-label="Clé API Anthropic" />
+          </div>
+          <Button type="submit" variant="accent">
+            OK
+          </Button>
+        </form>
+      ) : (
+        <div className="btn-row">
+          <Button size="sm" variant="glass" icon="key" onClick={() => setOpen(true)}>
+            J’ai une clé
+          </Button>
+          <a className="btn btn-ghost btn-sm" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
+            Obtenir une clé
+          </a>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -500,29 +566,5 @@ function BackLink({ onClick, label = 'Retour' }: { onClick: () => void; label?: 
     <button type="button" className="back-link" onClick={onClick}>
       <Icon name="back" size={16} /> {label}
     </button>
-  )
-}
-
-function ResultRow({ r, index, loading, owned, onPick }: { r: DgSearchResult; index: number; loading: boolean; owned: boolean; onPick: () => void }) {
-  const { artist, title } = splitTitle(r.title)
-  const f = describeFormat(r.formats)
-  return (
-    <motion.li initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: Math.min(index, 10) * 0.025 }}>
-      <button type="button" className="result" onClick={onPick} disabled={loading}>
-        <CoverArt src={{ artist, title, coverUrl: r.cover_image || r.thumb || undefined }} className="result-cover" lookup />
-        <span className="result-text">
-          <span className="record-title">{title}</span>
-          <span className="record-artist">{artist}</span>
-          <span className="record-meta mono">{[r.year, r.country, r.label?.[0], r.catno].filter(Boolean).join(' · ')}</span>
-          <span className="result-tags">
-            {f.color && <Badge tone="info">{f.color}</Badge>}
-            {f.reissue && <Badge>Réédition</Badge>}
-            {f.limited && <Badge tone="accent">Limitée</Badge>}
-            {owned && <Badge tone="up">Possédé</Badge>}
-          </span>
-        </span>
-        {loading ? <span className="spinner" /> : <Icon name="chevron" size={18} className="muted" />}
-      </button>
-    </motion.li>
   )
 }
