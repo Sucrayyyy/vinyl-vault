@@ -2,6 +2,7 @@ import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { ValueChart } from '../../components/Chart'
 import { CoverArt } from '../../components/CoverArt'
+import { Previews } from '../../components/Previews'
 import { Icon } from '../../components/Icon'
 import { Badge, Button, Chip, DemoBadge, ExternalLink, Field, IconButton, Segmented, Sheet, Skeleton, softSpring, spring } from '../../components/ui'
 import { deletePhoto } from '../../lib/db'
@@ -137,6 +138,8 @@ function DetailBody({ rec, onClose }: { rec: VinylRecord; onClose: () => void })
               {rec.mediaCondition && <Badge>Disque {rec.mediaCondition}</Badge>}
             </div>
           </div>
+
+          <Previews artist={rec.artist} title={rec.title} demo={rec.demo} />
 
           {/* Valeur */}
           <section className="panel">

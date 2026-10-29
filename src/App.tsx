@@ -1,6 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion, MotionConfig } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import { LogoMark } from './components/Logo'
+import { MiniPlayer } from './components/MiniPlayer'
 import { TabBar } from './components/TabBar'
 import { Toasts } from './components/ui'
 import { requestPersistence } from './lib/db'
@@ -74,9 +75,9 @@ export default function App() {
               className="main"
               custom={dir}
               variants={{
-                enter: (d: number) => ({ opacity: 0, x: 28 * d, filter: 'blur(4px)' }),
-                center: { opacity: 1, x: 0, filter: 'blur(0px)' },
-                exit: (d: number) => ({ opacity: 0, x: -28 * d, filter: 'blur(4px)' }),
+                enter: (d: number) => ({ opacity: 0, x: 28 * d }),
+                center: { opacity: 1, x: 0, transitionEnd: { transform: 'none' } },
+                exit: (d: number) => ({ opacity: 0, x: -28 * d }),
               }}
               initial="enter"
               animate="center"
@@ -90,6 +91,7 @@ export default function App() {
             </motion.main>
           </AnimatePresence>
           <AnimatePresence>{openRecordId && <RecordDetail key={openRecordId} id={openRecordId} />}</AnimatePresence>
+          <MiniPlayer />
           <TabBar />
           <AddFlow />
           <Toasts />

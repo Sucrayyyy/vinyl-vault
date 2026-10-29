@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CoverArt } from '../../components/CoverArt'
 import { Icon } from '../../components/Icon'
 import { Wordmark } from '../../components/Logo'
@@ -203,19 +204,22 @@ export function CollectionScreen() {
         </>
       )}
 
-      <motion.button
-        type="button"
-        className="fab"
-        onClick={() => setAddOpen(true)}
-        whileTap={{ scale: 0.92 }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ ...spring, delay: 0.2 }}
-        aria-label="Ajouter un vinyle"
-      >
-        <Icon name="plus" size={20} weight={2} />
-        <span>Ajouter un vinyle</span>
-      </motion.button>
+      {createPortal(
+        <motion.button
+          type="button"
+          className="fab"
+          onClick={() => setAddOpen(true)}
+          whileTap={{ scale: 0.92 }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ ...spring, delay: 0.2 }}
+          aria-label="Ajouter un vinyle"
+        >
+          <Icon name="plus" size={20} weight={2} />
+          <span>Ajouter un vinyle</span>
+        </motion.button>,
+        document.body,
+      )}
 
       <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtres et tri">
         <div className="form-stack">

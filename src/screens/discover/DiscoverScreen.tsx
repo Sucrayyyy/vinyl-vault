@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { CoverArt } from '../../components/CoverArt'
+import { Previews } from '../../components/Previews'
 import { Icon } from '../../components/Icon'
 import { Badge, Button, Chip, DemoBadge, Empty, ExternalLink, SectionHeader, Sheet, Skeleton, spring } from '../../components/ui'
 import { useAsync, useMoney, useOnline } from '../../lib/hooks'
@@ -465,6 +466,7 @@ export function RecoSheet({ reco, onClose }: { reco: Reco | null; onClose: () =>
             <div className="kicker">Pourquoi cette recommandation</div>
             <p>{reco.reason}</p>
           </div>
+          <Previews artist={reco.artist} title={reco.title} demo={reco.demo} />
           <div className="panel">
             <div className="kicker">Prix disponible</div>
             {reco.demo ? (

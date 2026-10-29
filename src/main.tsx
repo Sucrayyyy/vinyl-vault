@@ -9,6 +9,7 @@ import './styles/tokens.css'
 import './styles/base.css'
 import './styles/components.css'
 import './styles/screens.css'
+import './styles/glass.css'
 import App from './App'
 import { useApp } from './lib/store'
 
