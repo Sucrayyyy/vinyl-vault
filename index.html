@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#09090A" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Vinyl Vault — scannez, valorisez et explorez votre collection de vinyles." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Vault" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/svg+xml" href="/vinyl-vault/favicon.svg" />
+    <link rel="apple-touch-icon" href="/vinyl-vault/apple-touch-icon.png" />
+    <title>Vinyl Vault</title>
+    <script>
+      // Applique le thème avant le premier rendu (évite un flash de couleur).
+      try {
+        var t = localStorage.getItem('vv-theme') || 'system'
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+        document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="/vinyl-vault/assets/index-D-MEXPqj.js"></script>
+    <link rel="stylesheet" crossorigin href="/vinyl-vault/assets/index-BwUjkfTy.css">
+  <link rel="manifest" href="/vinyl-vault/manifest.webmanifest"></head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
